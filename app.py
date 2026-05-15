@@ -71,16 +71,14 @@ entry_rate = st.sidebar.number_input("エントリーレート", value=curr_p, f
 jpy_rate_now = st.sidebar.number_input("決済時の対円レート", value=jpy_r, format="%.4f")
 daily_vol = st.sidebar.number_input("1日の予想変動量", value=calc_daily_vol, format="%.5f")
 
-# --- スワップの符号修正ロジック ---
-# 基本設定値を読み込む（この値は SHORT 時の想定とする）
+# スワップの符号修正（SHORT基準の設定値をLONGで反転）
 base_swap = PAIR_CONFIG[selected_pair]["swap"]
-# LONG の場合は符号を反転させる。スワップがプラスならマイナス、マイナスならプラスへ。
 actual_swap_val = base_swap if order_side == "SHORT (売)" else -base_swap
 
 swap_input = st.sidebar.number_input("1万通貨のスワップ [円]", value=float(actual_swap_val))
 spread_pips = st.sidebar.number_input("スプレッド [pips]", value=PAIR_CONFIG[selected_pair]["spread"])
 
-# --- 証拠金計算 ---
+# 証拠金計算
 required_capital = (units * entry_rate * jpy_rate_now) / target_leverage
 st.sidebar.markdown("---")
 st.sidebar.subheader("💰 必要となる元手資金")
@@ -114,7 +112,7 @@ st.header(f"📊 {selected_pair} 運用シミュレーション")
 col1, col2, col3, col4 = st.columns(4)
 col1.metric("必要元手 (証拠金)", f"{required_capital:,.0f} 円")
 col2.metric("合計予測損益", f"{total_profit:,.0f} 円")
-col3.metric("累積スワップ", f"{total_swap:,.0f} 円", delta=None if total_swap >=0 else f"{total_swap:,.0f}", delta_color="inverse")
+col3.metric("累積スワップ", f"{total_swap:,.0f} 円")
 col4.metric("ロスカットレート", f"{loss_cut_rate:.4f}")
 
 # --- 推移テーブル ---
@@ -126,9 +124,14 @@ for i in range(0, diff_days + 1, 30):
     m_rate = entry_rate + (daily_vol * d_m * trend_sign)
     m_swap = (units / 10000) * swap_input * d_m
     m_fx = (entry_rate - m_rate) * units * jpy_rate_now if order_side == "SHORT (売)" else (m_rate - entry_rate) * units * jpy_rate_now
+    
+    # 修正ポイント：想定純資産を削除し、単純な合計損益を表示
     history.append({
-        "経過日数": f"{d_m}日", "予測レート": round(m_rate, 4), "累積スワップ": round(m_swap),
-        "為替損益": round(m_fx), "想定純資産": round(required_capital + m_swap + m_fx)
+        "経過日数": f"{d_m}日", 
+        "予測レート": round(m_rate, 4), 
+        "累積スワップ": round(m_swap),
+        "為替損益": round(m_fx), 
+        "損益合計": round(m_swap + m_fx) # 単純な損益を表示
     })
     if d_m == diff_days: break
 
